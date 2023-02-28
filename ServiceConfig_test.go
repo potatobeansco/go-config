@@ -15,6 +15,7 @@ func TestServiceConfig_ParseTo(t *testing.T) {
 		TestBool        bool     `config:"TEST_BOOL"`
 		TestFloat32     float32  `config:"TEST_FLOAT32"`
 		TestStringArray []string `config:"TEST_STRING_ARRAY"`
+		TestIntArray    []int    `config:"TEST_INT_ARRAY"`
 	}
 
 	expect := &TestConfig{
@@ -23,6 +24,7 @@ func TestServiceConfig_ParseTo(t *testing.T) {
 		TestBool:        true,
 		TestFloat32:     1.344,
 		TestStringArray: []string{"abc", "cde"},
+		TestIntArray:    []int{1, 2},
 	}
 
 	sc := ServiceConfig{
@@ -51,6 +53,11 @@ func TestServiceConfig_ParseTo(t *testing.T) {
 	}
 
 	err = os.Setenv("ABC_TEST_STRING_ARRAY", fmt.Sprintf("%s %s", expect.TestStringArray[0], expect.TestStringArray[1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.Setenv("ABC_TEST_INT_ARRAY", fmt.Sprintf("%d %d", expect.TestIntArray[0], expect.TestIntArray[1]))
 	if err != nil {
 		t.Fatal(err)
 	}

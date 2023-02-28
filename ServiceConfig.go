@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -30,7 +31,7 @@ func (sc ServiceConfig) getConfigName(name string) string {
 func (sc ServiceConfig) GetString(name string) (string, error) {
 	configData, exist := os.LookupEnv(sc.getConfigName(name))
 	if !exist {
-		return configData, ErrConfigNotFound
+		return "", ErrConfigNotFound
 	}
 	return configData, nil
 }
@@ -39,10 +40,29 @@ func (sc ServiceConfig) GetStringArray(name string) ([]string, error) {
 	configData, exist := os.LookupEnv(sc.getConfigName(name))
 	configDataArray := strings.Split(configData, sc.ArraySeparator)
 	if !exist {
-		return configDataArray, ErrConfigNotFound
+		return nil, ErrConfigNotFound
 	}
 
 	return configDataArray, nil
+}
+
+func (sc ServiceConfig) GetIntArray(name string) ([]int, error) {
+	configData, exist := os.LookupEnv(sc.getConfigName(name))
+	configDataArray := strings.Split(configData, sc.ArraySeparator)
+	if !exist {
+		return nil, ErrConfigNotFound
+	}
+
+	casted := make([]int, 0, len(configDataArray))
+	for _, v := range configDataArray {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("config name %s cannot be parsed: %w", name, err)
+		}
+		casted = append(casted, n)
+	}
+
+	return casted, nil
 }
 
 func (sc ServiceConfig) GetInt(name string) (int, error) {
@@ -97,6 +117,15 @@ func (sc ServiceConfig) GetStringArrayWithDefault(name string, defaultValue []st
 	return configDataArray, nil
 }
 
+func (sc ServiceConfig) GetIntArrayWithDefault(name string, defaultValue []int) ([]int, error) {
+	v, err := sc.GetIntArray(name)
+	if errors.Is(err, ErrConfigNotFound) {
+		return defaultValue, nil
+	}
+
+	return v, nil
+}
+
 func (sc ServiceConfig) GetIntWithDefault(name string, defaultValue int) (int, error) {
 	configData, exist := os.LookupEnv(sc.getConfigName(name))
 	if !exist {
@@ -136,7 +165,7 @@ func (sc ServiceConfig) GetFloat64WithDefault(name string, defaultValue float64)
 // field of type int with `config:"PORT"` tag and ServiceConfig.Prefix set with "WEB", will have the value retrieved
 // from an environment variable "WEB_PORT", and automatically parsed as integer.
 //
-// When the environment variable does not exists, the field is skipped. This way you can supply a prefilled struct that
+// When the environment variable does not exist, the field is skipped. This way you can supply a prefilled struct that
 // already have default values initialized. If the environment variable for the field does not exist (not configured
 // by administrator of the service), then default value is used.
 func (sc ServiceConfig) ParseTo(obj interface{}) error {
@@ -230,6 +259,19 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 			}
 
 			realV.Field(i).Set(reflect.ValueOf(val))
+		case []int:
+			val, err := sc.GetIntArray(tag)
+			if err != nil {
+				if err == ErrConfigNotFound {
+					continue
+				}
+
+				return sc.reformatParseError(tag, err)
+			}
+
+			realV.Field(i).Set(reflect.ValueOf(val))
+		default:
+			panic(fmt.Sprintf("unable to parse config for tag `%s`: unknown data type: %s", tag, t.String()))
 		}
 	}
 
@@ -237,7 +279,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 }
 
 func (sc ServiceConfig) reformatParseError(name string, err error) error {
-	return fmt.Errorf("cannot parse %s_%s: %v", sc.Prefix, name, err)
+	return fmt.Errorf("cannot parse %s_%s: %w", sc.Prefix, name, err)
 }
 
 func assertPointer(value interface{}) {
