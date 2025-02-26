@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strconv"
@@ -185,7 +186,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case int:
 			val, err := sc.GetInt(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -196,7 +197,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case int64:
 			val, err := sc.GetInt(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -207,7 +208,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case string:
 			val, err := sc.GetString(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -218,7 +219,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case float32:
 			val, err := sc.GetFloat32(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -229,7 +230,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case float64:
 			val, err := sc.GetFloat64(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -240,7 +241,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case bool:
 			val, err := sc.GetBool(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -251,7 +252,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case []string:
 			val, err := sc.GetStringArray(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -262,7 +263,7 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 		case []int:
 			val, err := sc.GetIntArray(tag)
 			if err != nil {
-				if err == ErrConfigNotFound {
+				if errors.Is(err, ErrConfigNotFound) {
 					continue
 				}
 
@@ -287,4 +288,37 @@ func assertPointer(value interface{}) {
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		panic("given value is not a pointer, or nil")
 	}
+}
+
+func (sc ServiceConfig) WriteTo(obj interface{}, w io.Writer) error {
+	assertPointer(obj)
+
+	v := reflect.ValueOf(obj)
+	realV := reflect.Indirect(v)
+	t := realV.Type()
+
+	for i := 0; i < realV.NumField(); i++ {
+		tag, ok := t.Field(i).Tag.Lookup("config")
+		if !ok {
+			continue
+		}
+
+		fieldValue := realV.Field(i)
+		value := fmt.Sprintf("%v", fieldValue.Interface())
+
+		parts := strings.Split(tag, ",")
+		key := parts[0]
+		isSecure := len(parts) > 1 && parts[1] == "secure"
+
+		if isSecure && value != "" {
+			value = "********"
+		}
+
+		_, err := fmt.Fprintf(w, "%s=%s, ", key, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
