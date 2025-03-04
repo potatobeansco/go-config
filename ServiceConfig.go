@@ -297,6 +297,7 @@ func (sc ServiceConfig) WriteTo(obj interface{}, w io.Writer) error {
 	realV := reflect.Indirect(v)
 	t := realV.Type()
 
+	configs := make([]string, 0)
 	for i := 0; i < realV.NumField(); i++ {
 		tag, ok := t.Field(i).Tag.Lookup("config")
 		if !ok {
@@ -314,10 +315,12 @@ func (sc ServiceConfig) WriteTo(obj interface{}, w io.Writer) error {
 			value = "********"
 		}
 
-		_, err := fmt.Fprintf(w, "%s=%s, ", key, value)
-		if err != nil {
-			return err
-		}
+		configs = append(configs, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	_, err := fmt.Fprintf(w, strings.Join(configs, ", "))
+	if err != nil {
+		return err
 	}
 
 	return nil
