@@ -177,11 +177,17 @@ func (sc ServiceConfig) ParseTo(obj interface{}) error {
 	t := realV.Type()
 
 	for i := 0; i < realV.NumField(); i++ {
-		tag, ok := t.Field(i).Tag.Lookup("config")
+		tags, ok := t.Field(i).Tag.Lookup("config")
 		if !ok {
 			continue
 		}
 
+		tagParts := strings.Split(tags, ",")
+		if tagParts == nil || len(tagParts) == 0 {
+			return sc.reformatParseError(tags, fmt.Errorf("unable to parse config for tag `%s`: invalid tag parts", tags))
+		}
+
+		tag := tagParts[0]
 		switch realV.Field(i).Interface().(type) {
 		case int:
 			val, err := sc.GetInt(tag)
