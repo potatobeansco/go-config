@@ -1,3 +1,3 @@
-module git.padmadigital.id/potato/go-config
+module github.com/potatobeansco/go-config
 
 go 1.20
